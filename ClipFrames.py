@@ -3,10 +3,12 @@ import os
 import numpy as np
 import cv2
 
+
 cap = None
 file_path: str # 開く動画ファイルのパス
 durations = [] # 保存するフレームの位置を記録するクラスを格納
 from_frame = -1 # 開始に選ばれたフレーム
+step_frame = 10 # 何フレーム間隔で保存するか
 is_playing = False # 再生中かどうか
 
 
@@ -14,9 +16,9 @@ def nothing(x):
     pass
 
 
-def on_seekbar_change(pos):
-    print('seekbar pos: {}'.format(pos))
-    set_cap_sec(pos)
+def on_stepframe_bar_change(new_step):
+    print('step change: {}'.format(new_step))
+    step_frame = new_step
 
 # ref: https://note.nkmk.me/python-opencv-video-to-still-image/
 def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="", ext='jpg'):
@@ -44,6 +46,33 @@ def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="",
     return 1
 
 
+def set_from_frame(frame):
+    from_frame = frame
+    print('from_frame: {}'.format(from_frame))
+
+
+def set_playback_frame(new_frame):
+    if cap.isOpened():
+        cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
+
+
+def skipback(back_frame):
+    if cap.isOpened():
+        new_frame = current_frame - back_frame
+        if new_frame < 0:
+            new_frame = 0
+        print('frame skipped: {} -> {}'.format(current_frame, new_frame))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
+
+def skipforward(forward_frame):
+    if cap.isOpened():
+        new_frame = current_frame + forward_frame
+        if new_frame > cap_allframes:
+            new_frame = cap_allframes
+        print('frame skipped: {} -> {}'.format(current_frame, new_frame))
+        cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
+
+
 def sec2frame(second):
     if cap.isOpened() and cap_fps:
         return int(second * cap_fps)
@@ -56,27 +85,22 @@ def frame2sec(frame):
     return None
 
 
-def set_cap_sec(second):
-    if cap.isOpened():
-        cap.set(cv2.CAP_PROP_POS_FRAMES, sec2frame(second)) # 再生開始位置指定
-        set_seekbar_pos(second)
+def print_usage():
+    print('Q = save images and exit')
+    print('Space=create start/stop frame')
+    print('A = back 5 seconds')
+    print('D = skip 5 seconds')
+    # print('W = 2x speed')
+    # print('S = 0.5x speed')
 
-def set_seekbar_pos(second):
-    if cap.isOpened():
-        cv2.setTrackbarPos('second', 'frame', second)
-
-def get_seekbar_pos():
-    if cap.isOpened():
-        return cv2.getTrackbarPos('second', 'frame')
-    return None
 
 class SaveDuration:
-    def __init__(self, frame_from, frame_to, dirname, basename="", step_frame=10):
+    def __init__(self, frame_from, frame_to, step_frame=10, dirname=None, basename=""):
         self.frame_from = frame_from
         self.frame_to = frame_to
+        self.step_frame = step_frame
         self.dirname = dirname
         self.basename = basename
-        self.step_frame = step_frame
 
     def save_file(self):
         save_frame_range(self.frame_from, self.frame_to, self.step_frame, "./saved_images/"+self.dirname, self.basename)
@@ -85,7 +109,7 @@ class SaveDuration:
 
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
-        file_path = input('動画ファイルを指定してください: ')
+        file_path = input('動画ファイルのパスを入力してください: ')
     else:
         file_path = sys.argv[1]
     
@@ -101,7 +125,7 @@ if __name__ == "__main__":
     cap_fps = int(cap.get(cv2.CAP_PROP_FPS))
     cap_allsec = frame2sec(cap_allframes)
     print('sec', cap_allsec)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # 再生開始位置指定
+    set_playback_frame(0)
 
 
     cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) / 2) # サイズ基本デカすぎるので半分に(ツールバーでいじりたい)
@@ -112,8 +136,11 @@ if __name__ == "__main__":
 
     cv2.namedWindow("frame", cv2.WINDOW_AUTOSIZE | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_EXPANDED)
 
-    # シークバーなどの作成
-    cv2.createTrackbar('second', 'frame', 0, frame2sec(cap_allframes), on_seekbar_change)
+    # フレーム間隔をいじれるトラックバーの作成
+    cv2.createTrackbar('step', 'frame', step_frame, 50, on_stepframe_bar_change)
+    cv2.setTrackbarMin('step', 'frame', 1)
+
+    print_usage()
 
     while(cap.isOpened()):
         ret, frame = cap.read()
@@ -123,36 +150,39 @@ if __name__ == "__main__":
             current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # 現在の再生位置（フレーム位置）の取得
             current_sec = int(frame2sec(current_frame))
             
-            cv2.putText(frame, 'frame: {}'.format(current_frame), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            cv2.putText(frame, 'frame: {}/{}'.format(current_frame, cap_allframes), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
 
             # フレームサイズの変更
             frame = cv2.resize(frame, dsize=(cap_width, cap_height))
             
             cv2.imshow('frame',frame)
-            
-            set_seekbar_pos(frame2sec(current_frame)) # change tracker pos
+
             key = cv2.waitKey(1) & 0xFF # get pressed key
 
             if key == ord('q'):
                 break
+            elif key == ord('a'):
+                # back 5s
+                skipback(5*cap_fps)
+            elif key == ord('d'):
+                # skip 5s
+                skipforward(5*cap_fps)
             elif key == 32: # space
-                if(from_frame == -1):
-                    from_frame = current_frame
+                if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
+                    print('from_frame({}) is bigger than current_frame({})'.format(from_frame, current_frame))
+                    set_from_frame(current_frame)
+                elif from_frame == -1:
+                    set_from_frame(current_frame)
                 else:
-                    duration = SaveDuration(from_frame, current_frame, os.path.splitext(os.path.basename(file_path))[0])
+                    duration = SaveDuration(from_frame, current_frame, step_frame, os.path.splitext(os.path.basename(file_path))[0])
                     durations.append(duration)
+                    print('add duration: {} -> {}'.format(duration.frame_from, duration.frame_to))
                     from_frame = -1
 
         else:
             is_playing = False
-
-            while(True):
-                key = cv2.waitKey(1) & 0xFF # wait for key
-                current_sec = int(frame2sec(current_frame))
-                print('current' + current_sec)
-                if cap_allsec > current_sec:
-                    print('break')
-                    break
+            key = cv2.waitKey(0) & 0xFF # wait for key
+            set_playback_frame(0)
 
             
 
