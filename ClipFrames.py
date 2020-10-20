@@ -18,6 +18,7 @@ def nothing(x):
 
 
 def on_stepframe_bar_change(new_step):
+    global step_frame
     print('step change: {}'.format(new_step))
     step_frame = new_step
 
@@ -48,6 +49,7 @@ def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="",
 
 
 def set_from_frame(frame):
+    global from_frame
     from_frame = frame
     print('from_frame: {}'.format(from_frame))
 
@@ -202,7 +204,7 @@ if __name__ == "__main__":
                 duration = SaveDuration(from_frame, current_frame, step_frame, os.path.splitext(os.path.basename(file_path))[0])
                 durations.append(duration)
                 print('add duration: {} -> {}'.format(duration.frame_from, duration.frame_to))
-                from_frame = -1
+                set_from_frame(-1)
 
 
 
