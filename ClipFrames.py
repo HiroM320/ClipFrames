@@ -10,6 +10,7 @@ durations = [] # 保存するフレームの位置を記録するクラスを格
 from_frame = -1 # 開始に選ばれたフレーム
 step_frame = 10 # 何フレーム間隔で保存するか
 is_playing = False # 再生中かどうか
+paused = False # ポーズしてるとTrue
 
 
 def nothing(x):
@@ -51,6 +52,23 @@ def set_from_frame(frame):
     print('from_frame: {}'.format(from_frame))
 
 
+def pause():
+    global paused
+    paused = True
+    print('pause')
+
+def resume():
+    global paused
+    paused = False
+    print('resume')
+
+def toggle_pause():
+    if(paused):
+        resume()
+    else:
+        pause()
+
+
 def set_playback_frame(new_frame):
     if cap.isOpened():
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
@@ -88,6 +106,7 @@ def frame2sec(frame):
 def print_usage():
     print('Q = save images and exit')
     print('Space=create start/stop frame')
+    print('W = pause/resume')
     print('A = back 5 seconds')
     print('D = skip 5 seconds')
     # print('W = 2x speed')
@@ -145,8 +164,9 @@ if __name__ == "__main__":
     while(cap.isOpened()):
         ret, frame = cap.read()
 
-        if(ret):
+        if(not paused and ret):
             is_playing = True
+            
             current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # 現在の再生位置（フレーム位置）の取得
             current_sec = int(frame2sec(current_frame))
             
@@ -157,34 +177,32 @@ if __name__ == "__main__":
             
             cv2.imshow('frame',frame)
 
-            key = cv2.waitKey(1) & 0xFF # get pressed key
-
-            if key == ord('q'):
-                break
-            elif key == ord('a'):
-                # back 5s
-                skipback(5*cap_fps)
-            elif key == ord('d'):
-                # skip 5s
-                skipforward(5*cap_fps)
-            elif key == 32: # space
-                if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
-                    print('from_frame({}) is bigger than current_frame({})'.format(from_frame, current_frame))
-                    set_from_frame(current_frame)
-                elif from_frame == -1:
-                    set_from_frame(current_frame)
-                else:
-                    duration = SaveDuration(from_frame, current_frame, step_frame, os.path.splitext(os.path.basename(file_path))[0])
-                    durations.append(duration)
-                    print('add duration: {} -> {}'.format(duration.frame_from, duration.frame_to))
-                    from_frame = -1
-
         else:
             is_playing = False
-            key = cv2.waitKey(0) & 0xFF # wait for key
-            set_playback_frame(0)
 
-            
+        key = cv2.waitKey(1) & 0xFF # get pressed key
+        if key == ord('q'):
+            break
+        elif key == ord('w'):
+            # pause/resume
+            toggle_pause()
+        elif key == ord('a'):
+            # back 5s
+            skipback(5*cap_fps)
+        elif key == ord('d'):
+            # skip 5s
+            skipforward(5*cap_fps)
+        elif key == 32: # space
+            if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
+                print('from_frame({}) is bigger than current_frame({})'.format(from_frame, current_frame))
+                set_from_frame(current_frame)
+            elif from_frame == -1:
+                set_from_frame(current_frame)
+            else:
+                duration = SaveDuration(from_frame, current_frame, step_frame, os.path.splitext(os.path.basename(file_path))[0])
+                durations.append(duration)
+                print('add duration: {} -> {}'.format(duration.frame_from, duration.frame_to))
+                from_frame = -1
 
 
 
