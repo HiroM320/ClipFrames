@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import numpy as np
 import cv2
 
@@ -7,7 +8,8 @@ import cv2
 cap = None
 file_path: str # 開く動画ファイルのパス
 durations = [] # 保存するフレームの位置を記録するクラスを格納
-from_frame = -1 # 開始に選ばれたフレーム
+tickmeter = cv2.TickMeter()
+from_frame = -1 # 再生開始(再開)に選ばれたフレーム
 step_frame = 10 # 何フレーム間隔で保存するか
 is_playing = False # 再生中かどうか
 paused = False # ポーズしてるとTrue
@@ -87,21 +89,21 @@ def skipback(back_frame):
 def skipforward(forward_frame):
     if cap.isOpened():
         new_frame = current_frame + forward_frame
-        if new_frame > cap_allframes:
-            new_frame = cap_allframes
+        if new_frame > expected_frames:
+            new_frame = expected_frames
         print('frame skipped: {} -> {}'.format(current_frame, new_frame))
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
 
 
 def sec2frame(second):
-    if cap.isOpened() and cap_fps:
-        return int(second * cap_fps)
+    if cap.isOpened() and expected_fps:
+        return int(second * expected_fps)
     return None
 
 
 def frame2sec(frame):
     if cap.isOpened():
-        return int(frame / cap_fps)
+        return int(frame / expected_fps)
     return None
 
 
@@ -142,17 +144,17 @@ if __name__ == "__main__":
         print('{} is not found'.format(file_path))
         sys.exit()
 
-    cap_allframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
-    cap_fps = int(cap.get(cv2.CAP_PROP_FPS))
-    cap_allsec = frame2sec(cap_allframes)
-    print('sec', cap_allsec)
+    expected_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
+    expected_fps = int(cap.get(cv2.CAP_PROP_FPS))
+    expected_sec = frame2sec(expected_frames)
+    print('expected sec', expected_sec)
+    print('expected fps: {}'.format(expected_fps))
     set_playback_frame(0)
 
 
     cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) / 2) # サイズ基本デカすぎるので半分に(ツールバーでいじりたい)
     cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2)
 
-    print('fps: {}'.format(cap_fps))
     print('resolution: {}x{}'.format(cap_width, cap_height))
 
     cv2.namedWindow("frame", cv2.WINDOW_AUTOSIZE | cv2.WINDOW_KEEPRATIO | cv2.WINDOW_GUI_EXPANDED)
@@ -163,21 +165,30 @@ if __name__ == "__main__":
 
     print_usage()
 
+    tickmeter.start() # 時間計測開始
+    wait_counter_from = time.perf_counter() # 動画の再生速度をFPSに合わせるため
+
+    count = 0
+
     while(cap.isOpened()):
         ret, frame = cap.read()
+
+        if 1 / expected_fps > (time.perf_counter() - wait_counter_from): # 再生速度を正しくしたかったけど難しい
+            continue
 
         if(not paused and ret):
             is_playing = True
             
             current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # 現在の再生位置（フレーム位置）の取得
-            current_sec = int(frame2sec(current_frame))
+            current_sec = tickmeter.getTimeSec()
             
-            cv2.putText(frame, 'frame: {}/{}'.format(current_frame, cap_allframes), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            cv2.putText(frame, 'frame: {}/{}'.format(current_frame, expected_frames), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
 
             # フレームサイズの変更
             frame = cv2.resize(frame, dsize=(cap_width, cap_height))
             
-            cv2.imshow('frame',frame)
+            cv2.imshow('frame', frame)
+            wait_counter_from = time.perf_counter()
 
         else:
             is_playing = False
@@ -190,10 +201,10 @@ if __name__ == "__main__":
             toggle_pause()
         elif key == ord('a'):
             # back 5s
-            skipback(5*cap_fps)
+            skipback(5*expected_fps)
         elif key == ord('d'):
             # skip 5s
-            skipforward(5*cap_fps)
+            skipforward(5*expected_fps)
         elif key == 32: # space
             if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
                 print('from_frame({}) is bigger than current_frame({})'.format(from_frame, current_frame))
