@@ -8,7 +8,6 @@ import cv2
 cap = None
 file_path: str # 開く動画ファイルのパス
 durations = [] # 保存するフレームの位置を記録するクラスを格納
-tickmeter = cv2.TickMeter()
 from_frame = -1 # 再生開始(再開)に選ばれたフレーム
 step_frame = 10 # 何フレーム間隔で保存するか
 is_playing = False # 再生中かどうか
@@ -34,7 +33,7 @@ def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="",
 
     digit = len(str(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
 
-    for n in range(start_frame, stop_frame, step_frame):
+    for n in range(int(start_frame), int(stop_frame), step_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)
         ret, frame = cap.read()
         if ret:
@@ -146,7 +145,9 @@ if __name__ == "__main__":
 
     expected_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
     expected_fps: float = cap.get(cv2.CAP_PROP_FPS)
-    expected_sec = frame2sec(expected_frames)
+    expected_sec: float = frame2sec(expected_frames)
+    delay_interframe: float = 1/expected_fps # 実際にはwaitkeyが入っていることを考慮する必要がある
+    print(delay_interframe)
     print('expected sec', expected_sec)
     print('expected fps: {}'.format(expected_fps))
     set_playback_frame(0)
@@ -166,12 +167,13 @@ if __name__ == "__main__":
     print_usage()
 
     wait_counter_from = time.perf_counter() # 動画の再生速度をFPSに合わせるため
-    tickmeter.start() # 時間計測開始
 
     while(cap.isOpened()):
-        ret, frame = cap.read()
+        if(not paused):
+            wait_counter_from = time.perf_counter()
+            ret, frame = cap.read()
 
-        if(not paused and ret):
+        if(ret):
             is_playing = True
             
             current_frame: float = cap.get(cv2.CAP_PROP_POS_FRAMES) # 現在の再生位置（フレーム位置）の取得
@@ -179,15 +181,16 @@ if __name__ == "__main__":
 
             cv2.putText(frame, 'frame: {:.3f}/{:.3f}'.format(current_frame, expected_frames), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
             cv2.putText(frame, 'sec: {:.3f}/{:.3f}'.format(current_sec, expected_sec), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
-            tickmeter.stop()
-            cv2.putText(frame, 'tickmeter: {:.3f}'.format(tickmeter.getTimeSec()), (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
-            tickmeter.start()
 
             # フレームサイズの変更
             frame = cv2.resize(frame, dsize=(cap_width, cap_height))
             
             cv2.imshow('frame', frame)
-            wait_counter_from = time.perf_counter()
+
+            while True:
+                elapsed: float = time.perf_counter() - wait_counter_from
+                if elapsed >= delay_interframe:
+                    break
 
         else:
             is_playing = False
@@ -195,14 +198,11 @@ if __name__ == "__main__":
         key = cv2.waitKey(1) & 0xFF # get pressed key
         if key == ord('q'):
             break
-        elif key == ord('w'):
-            # pause/resume
+        elif key == ord('w'): # pause/resume
             toggle_pause()
-        elif key == ord('a'):
-            # back 5s
+        elif key == ord('a'): # back 5s
             skip_back(5*expected_fps)
-        elif key == ord('d'):
-            # skip 5s
+        elif key == ord('d'): # skip 5s
             skip_forward(5*expected_fps)
         elif key == 32: # space
             if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
