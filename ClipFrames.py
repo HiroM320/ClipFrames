@@ -78,7 +78,7 @@ def set_playback_frame(new_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
 
 
-def skipback(back_frame):
+def skip_back(back_frame):
     if cap.isOpened():
         new_frame = current_frame - back_frame
         if new_frame < 0:
@@ -86,7 +86,7 @@ def skipback(back_frame):
         print('frame skipped: {} -> {}'.format(current_frame, new_frame))
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
 
-def skipforward(forward_frame):
+def skip_forward(forward_frame):
     if cap.isOpened():
         new_frame = current_frame + forward_frame
         if new_frame > expected_frames:
@@ -95,15 +95,15 @@ def skipforward(forward_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
 
 
-def sec2frame(second):
+def sec2frame(second) -> float:
     if cap.isOpened() and expected_fps:
-        return int(second * expected_fps)
+        return second * expected_fps
     return None
 
 
-def frame2sec(frame):
+def frame2sec(frame) -> float:
     if cap.isOpened():
-        return int(frame / expected_fps)
+        return frame / expected_fps
     return None
 
 
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         sys.exit()
 
     expected_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
-    expected_fps = int(cap.get(cv2.CAP_PROP_FPS))
+    expected_fps: float = cap.get(cv2.CAP_PROP_FPS)
     expected_sec = frame2sec(expected_frames)
     print('expected sec', expected_sec)
     print('expected fps: {}'.format(expected_fps))
@@ -165,24 +165,23 @@ if __name__ == "__main__":
 
     print_usage()
 
-    tickmeter.start() # 時間計測開始
     wait_counter_from = time.perf_counter() # 動画の再生速度をFPSに合わせるため
-
-    count = 0
+    tickmeter.start() # 時間計測開始
 
     while(cap.isOpened()):
         ret, frame = cap.read()
 
-        if 1 / expected_fps > (time.perf_counter() - wait_counter_from): # 再生速度を正しくしたかったけど難しい
-            continue
-
         if(not paused and ret):
             is_playing = True
             
-            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) # 現在の再生位置（フレーム位置）の取得
-            current_sec = tickmeter.getTimeSec()
-            
-            cv2.putText(frame, 'frame: {}/{}'.format(current_frame, expected_frames), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            current_frame: float = cap.get(cv2.CAP_PROP_POS_FRAMES) # 現在の再生位置（フレーム位置）の取得
+            current_sec: float = frame2sec(current_frame)
+
+            cv2.putText(frame, 'frame: {:.3f}/{:.3f}'.format(current_frame, expected_frames), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            cv2.putText(frame, 'sec: {:.3f}/{:.3f}'.format(current_sec, expected_sec), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            tickmeter.stop()
+            cv2.putText(frame, 'tickmeter: {:.3f}'.format(tickmeter.getTimeSec()), (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
+            tickmeter.start()
 
             # フレームサイズの変更
             frame = cv2.resize(frame, dsize=(cap_width, cap_height))
@@ -201,10 +200,10 @@ if __name__ == "__main__":
             toggle_pause()
         elif key == ord('a'):
             # back 5s
-            skipback(5*expected_fps)
+            skip_back(5*expected_fps)
         elif key == ord('d'):
             # skip 5s
-            skipforward(5*expected_fps)
+            skip_forward(5*expected_fps)
         elif key == 32: # space
             if from_frame > current_frame: # 開始フレームが現在フレームより後(未来)なら
                 print('from_frame({}) is bigger than current_frame({})'.format(from_frame, current_frame))
@@ -216,8 +215,6 @@ if __name__ == "__main__":
                 durations.append(duration)
                 print('add duration: {} -> {}'.format(duration.frame_from, duration.frame_to))
                 set_from_frame(-1)
-
-
 
     for duration in durations:
         duration.save_file()
