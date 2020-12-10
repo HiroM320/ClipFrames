@@ -94,13 +94,13 @@ def skip_forward(forward_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame) # 再生開始位置指定
 
 
-def sec2frame(second) -> float:
+def sec2frame(second):
     if cap.isOpened() and expected_fps:
         return second * expected_fps
     return None
 
 
-def frame2sec(frame) -> float:
+def frame2sec(frame):
     if cap.isOpened():
         return frame / expected_fps
     return None
@@ -125,7 +125,7 @@ class SaveDuration:
         self.basename = basename
 
     def save_file(self):
-        save_frame_range(self.frame_from, self.frame_to, self.step_frame, "./saved_images/"+self.dirname, self.basename)
+        save_frame_range(self.frame_from, self.frame_to, self.step_frame, "./saved_images/{}".format(self.dirname), self.basename)
 
 
 
@@ -144,9 +144,9 @@ if __name__ == "__main__":
         sys.exit()
 
     expected_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
-    expected_fps: float = cap.get(cv2.CAP_PROP_FPS)
-    expected_sec: float = frame2sec(expected_frames)
-    delay_interframe: float = 1/expected_fps # 実際にはwaitkeyが入っていることを考慮する必要がある
+    expected_fps = cap.get(cv2.CAP_PROP_FPS)
+    expected_sec = frame2sec(expected_frames)
+    delay_interframe = 1/expected_fps # 実際にはwaitkeyが入っていることを考慮する必要がある
     print(delay_interframe)
     print('expected sec', expected_sec)
     print('expected fps: {}'.format(expected_fps))
@@ -168,6 +168,10 @@ if __name__ == "__main__":
 
     wait_counter_from = time.perf_counter() # 動画の再生速度をFPSに合わせるため
 
+    ret = False
+    frame = None
+    current_frame = 0
+
     while(cap.isOpened()):
         if(not paused):
             wait_counter_from = time.perf_counter()
@@ -176,8 +180,8 @@ if __name__ == "__main__":
         if(ret):
             is_playing = True
             
-            current_frame: float = cap.get(cv2.CAP_PROP_POS_FRAMES) # 現在の再生位置（フレーム位置）の取得
-            current_sec: float = frame2sec(current_frame)
+            current_frame = cap.get(cv2.CAP_PROP_POS_FRAMES) # 現在の再生位置（フレーム位置）の取得
+            current_sec = frame2sec(current_frame)
 
             cv2.putText(frame, 'frame: {:.3f}/{:.3f}'.format(current_frame, expected_frames), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
             cv2.putText(frame, 'sec: {:.3f}/{:.3f}'.format(current_sec, expected_sec), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), thickness=2)
