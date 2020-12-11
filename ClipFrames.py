@@ -1,9 +1,9 @@
 import sys
+import argparse
 import os
 import time
 import numpy as np
 import cv2
-
 
 cap = None
 file_path: str # 開く動画ファイルのパス
@@ -130,10 +130,24 @@ class SaveDuration:
 
 
 if __name__ == "__main__":
-    if(len(sys.argv) < 2):
+
+    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
+
+    parser.add_argument(
+        '-i', '--input', nargs='?', type=str,required=False, default=None,
+        help = 'Video input path'
+    )
+
+    parser.add_argument(
+        '-s', '--speed', nargs='?', type=float,required=False,default=1.0,
+        help = 'Video playback speed'
+    )
+
+    FLAGS = parser.parse_args()
+
+    file_path = FLAGS.input
+    if(file_path is None):
         file_path = input('動画ファイルのパスを入力してください: ')
-    else:
-        file_path = sys.argv[1]
     
     cap = cv2.VideoCapture(file_path)
 
@@ -146,7 +160,8 @@ if __name__ == "__main__":
     expected_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) # 総フレーム数の取得
     expected_fps = cap.get(cv2.CAP_PROP_FPS)
     expected_sec = frame2sec(expected_frames)
-    delay_interframe = 1/expected_fps # 実際にはwaitkeyが入っていることを考慮する必要がある
+    delay_interframe = 1/expected_fps # 正確にはwaitkeyが入っていることを考慮する必要がある
+    playback_speed = FLAGS.speed
     print(delay_interframe)
     print('expected sec', expected_sec)
     print('expected fps: {}'.format(expected_fps))
@@ -193,7 +208,7 @@ if __name__ == "__main__":
 
             while True:
                 elapsed: float = time.perf_counter() - wait_counter_from
-                if elapsed >= delay_interframe:
+                if elapsed >= delay_interframe / playback_speed:
                     break
 
         else:
