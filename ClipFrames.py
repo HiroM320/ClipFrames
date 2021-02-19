@@ -33,7 +33,8 @@ def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="",
 
     digit = len(str(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
 
-    for n in range(int(start_frame), int(stop_frame), step_frame):
+    if start_frame == stop_frame:
+        n = int(start_frame)
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)
         ret, frame = cap.read()
         if ret:
@@ -45,7 +46,19 @@ def save_frame_range(start_frame, stop_frame, step_frame, dir_path, basename="",
             print('{} saved'.format(save_path))
         else:
             return 0
-
+    else:
+        for n in range(int(start_frame), int(stop_frame), step_frame):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, n)
+            ret, frame = cap.read()
+            if ret:
+                if(basename):
+                    save_path = '{}_{}.{}'.format(base_path, str(n).zfill(digit), ext)
+                else:
+                    save_path = '{}{}.{}'.format(base_path, str(n).zfill(digit), ext)
+                cv2.imwrite(save_path, frame)
+                print('{} saved'.format(save_path))
+            else:
+                return 0
     return 1
 
 
