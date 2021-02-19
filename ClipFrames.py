@@ -143,6 +143,11 @@ if __name__ == "__main__":
         help = 'Video playback speed'
     )
 
+    parser.add_argument(
+        '-e', '--expand', nargs='?', type=float, required=False, default=1.0,
+        help = 'Video resolution expand'
+    )
+
     FLAGS = parser.parse_args()
 
     file_path = FLAGS.input
@@ -162,14 +167,16 @@ if __name__ == "__main__":
     expected_sec = frame2sec(expected_frames)
     delay_interframe = 1/expected_fps # 正確にはwaitkeyが入っていることを考慮する必要がある
     playback_speed = FLAGS.speed
+    res_expand = FLAGS.expand
+
     print(delay_interframe)
     print('expected sec', expected_sec)
     print('expected fps: {}'.format(expected_fps))
     set_playback_frame(0)
 
 
-    cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) / 2) # サイズ基本デカすぎるので半分に(ツールバーでいじりたい)
-    cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2)
+    cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) * res_expand) # サイズ基本デカすぎるので半分に(ツールバーでいじりたい)
+    cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) * res_expand)
 
     print('resolution: {}x{}'.format(cap_width, cap_height))
 
